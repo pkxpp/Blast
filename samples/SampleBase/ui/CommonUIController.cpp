@@ -441,7 +441,13 @@ void CommonUIController::drawUI()
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4());
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
 
-		const char* text = getDamageToolController().isDamageMode() ? "DAMAGE MODE (PRESS SPACE)" : "DRAG MODE (PRESS SPACE)";
+		const char* text = "??? MODE (PRESS SPACE)";
+		switch (getDamageToolController().getMode())
+		{
+		case DamageToolController::Mode::Damage: text = "DAMAGE MODE (PRESS SPACE)"; break;
+		case DamageToolController::Mode::Drag:   text = "DRAG MODE (PRESS SPACE)"; break;
+		case DamageToolController::Mode::Force:  text = "FORCE MODE (PRESS SPACE)"; break;
+		}
 		ImVec2 size = ImGui::CalcTextSize(text);
 		ImGui::SetNextWindowPos(ImVec2((getRenderer().getScreenWidth() - size.x) / 2, 0));
 		ImGui::Begin("Mode Text", 0, ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);

@@ -32,7 +32,7 @@
 #include "Mesh.h"
 #include <vector>
 #include <memory>
-
+#include <string>
 
 class BlastModel;
 typedef std::shared_ptr<const BlastModel> BlastModelPtr;

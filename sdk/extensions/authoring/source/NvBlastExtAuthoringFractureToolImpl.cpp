@@ -28,6 +28,7 @@
 #include "NvBlastExtAuthoringFractureToolImpl.h"
 #include "NvBlastExtAuthoringMeshImpl.h"
 #include "NvBlastExtAuthoringMeshUtils.h"
+#include <cmath>
 
 // This warning arises when using some stl containers with older versions of VC
 // c:\program files (x86)\microsoft visual studio 12.0\vc\include\xtree(1826): warning C4702: unreachable code

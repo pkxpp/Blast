@@ -42,6 +42,7 @@
 #include "NvBlastExtPxFamily.h"
 
 #include "PxRigidDynamic.h"
+#include "PxRigidBodyExt.h"
 #include "PxScene.h"
 
 
@@ -62,9 +63,10 @@ static const float SEGMENT_DAMAGE_MAX_DISTANCE = 100.0f;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DamageToolController::DamageToolController()
-	: m_damage(100.0f), m_toolColor(1.0f, 1.0f, 1.0f, 0.4f), 
-	m_toolRenderMaterial(nullptr), m_sphereToolRenderable(nullptr), m_lineToolRenderable(nullptr), 
-	m_explosiveImpulse(100), m_damagerIndex(0), m_stressForceFactor(1.0f), m_isMousePressed(false), m_damageCountWhilePressed(0)
+	: m_damage(100.0f), m_toolColor(1.0f, 1.0f, 1.0f, 0.4f),
+	m_toolRenderMaterial(nullptr), m_sphereToolRenderable(nullptr), m_lineToolRenderable(nullptr),
+	m_explosiveImpulse(100), m_damagerIndex(0), m_stressForceFactor(1.0f), m_isMousePressed(false), m_damageCountWhilePressed(0),
+	m_mode(Mode::Damage), m_forceStrength(2000.f)
 {
 	// damage amount calc using NvBlastExtMaterial
 	auto getDamageAmountFn = [](const float damage, ExtPxActor* actor)
@@ -276,7 +278,7 @@ void DamageToolController::onSampleStart()
 	m_damagerIndex = 0;
 
 	// start with damage mode by default
-	setDamageMode(true);
+	setMode(Mode::Damage);
 }
 
 void DamageToolController::onInitialize()
@@ -302,7 +304,7 @@ void DamageToolController::Animate(double dt)
 	m_lineToolRenderable->setHidden(true);
 
 	// damage mode
-	if (m_damageMode)
+	if (m_mode == Mode::Damage)
 	{
 		const Damager& damager = m_damagers[m_damagerIndex];
 
@@ -336,7 +338,7 @@ void DamageToolController::Animate(double dt)
 				damager.executeFunction(&damager, actor, family, data);
 			};
 
-			// should damage? 
+			// should damage?
 			bool shouldDamage = false;
 			if (m_isMousePressed)
 			{
@@ -399,6 +401,37 @@ void DamageToolController::Animate(double dt)
 			m_prevWasHit = false;
 		}
 	}
+	// force mode
+	else if (m_mode == Mode::Force)
+	{
+		if (m_isMousePressed && m_damageCountWhilePressed == 0)
+		{
+			PxVec3 eyePos, pickDir;
+			getPhysXController().getEyePoseAndPickDir(m_lastMousePos.x, m_lastMousePos.y, eyePos, pickDir);
+			pickDir = pickDir.getNormalized();
+
+			PxRaycastHit hit;
+			PxRaycastBuffer hitBuffer(&hit, 1);
+			bool isHit = getPhysXController().getPhysXScene().raycast(eyePos, pickDir, PX_MAX_F32, hitBuffer,
+				PxHitFlag::ePOSITION | PxHitFlag::eNORMAL, PxQueryFilterData(PxQueryFlag::eDYNAMIC));
+
+			if (isHit)
+			{
+				PxRigidDynamic* rigidDynamic = hit.actor->is<PxRigidDynamic>();
+				if (rigidDynamic && !rigidDynamic->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC))
+				{
+					PxVec3 impulse = pickDir * m_forceStrength / static_cast<float>(dt);
+					PxRigidBodyExt::addForceAtPos(*rigidDynamic, impulse, hit.position, PxForceMode::eIMPULSE, true);
+				}
+			}
+
+			m_damageCountWhilePressed++;
+		}
+		else if (!m_isMousePressed)
+		{
+			m_damageCountWhilePressed = 0;
+		}
+	}
 }
 
 
@@ -440,7 +473,9 @@ LRESULT DamageToolController::MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 		}
 		else if (iKeyPressed == VK_SPACE)
 		{
-			setDamageMode(!isDamageMode());
+			const Mode modes[] = { Mode::Damage, Mode::Drag, Mode::Force };
+			int idx = (static_cast<int>(m_mode) + 1) % 3;
+			setMode(modes[idx]);
 		}
 	}
 
@@ -449,27 +484,34 @@ LRESULT DamageToolController::MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 
 void DamageToolController::drawUI()
 {
-	ImGui::DragFloat("Damage Amount", &m_damage, 1.0f);
-	ImGui::DragFloat("Explosive Impulse", &m_explosiveImpulse);
-	ImGui::DragFloat("Stress Damage Force", &m_stressForceFactor);
+	if (m_mode == Mode::Force)
+	{
+		ImGui::DragFloat("Force Strength", &m_forceStrength, 100.f, 0.f, 100000.f);
+	}
+	else
+	{
+		ImGui::DragFloat("Damage Amount", &m_damage, 1.0f);
+		ImGui::DragFloat("Explosive Impulse", &m_explosiveImpulse);
+		ImGui::DragFloat("Stress Damage Force", &m_stressForceFactor);
 
-	// - - - - - - - -
-	ImGui::Spacing();
+		// - - - - - - - -
+		ImGui::Spacing();
 
-	// Armory
-	ImGui::Combo("Damage Profile", (int*)&m_damagerIndex, m_damagerNames.data(), (int)m_damagerNames.size(), -1);
-	Damager& damager = m_damagers[m_damagerIndex];
-	ImGui::DragFloat("Damage Radius (Mouse WH)", &damager.radius);
-	ImGui::Checkbox("Damage Continuously", &damager.damageWhilePressed);
+		// Armory
+		ImGui::Combo("Damage Profile", (int*)&m_damagerIndex, m_damagerNames.data(), (int)m_damagerNames.size(), -1);
+		Damager& damager = m_damagers[m_damagerIndex];
+		ImGui::DragFloat("Damage Radius (Mouse WH)", &damager.radius);
+		ImGui::Checkbox("Damage Continuously", &damager.damageWhilePressed);
+	}
 }
 
-void DamageToolController::setDamageMode(bool enabled)
+void DamageToolController::setMode(Mode mode)
 {
-	m_damageMode = enabled;
+	m_mode = mode;
 
-	getPhysXController().setDraggingEnabled(!m_damageMode);
+	getPhysXController().setDraggingEnabled(mode == Mode::Drag);
 
-	if (!m_damageMode)
+	if (mode != Mode::Damage)
 	{
 		m_sphereToolRenderable->setHidden(true);
 		m_lineToolRenderable->setHidden(true);

@@ -54,6 +54,13 @@ class ExtPxActor;
 class DamageToolController : public ISampleController
 {
 public:
+	enum class Mode
+	{
+		Damage,
+		Drag,
+		Force
+	};
+
 	DamageToolController();
 	virtual ~DamageToolController();
 
@@ -68,7 +75,22 @@ public:
 
 	bool isDamageMode() const
 	{
-		return m_damageMode;
+		return m_mode == Mode::Damage;
+	}
+
+	bool isDragMode() const
+	{
+		return m_mode == Mode::Drag;
+	}
+
+	bool isForceMode() const
+	{
+		return m_mode == Mode::Force;
+	}
+
+	Mode getMode() const
+	{
+		return m_mode;
 	}
 
 private:
@@ -79,7 +101,7 @@ private:
 
 	void changeDamageRadius(float dr);
 
-	void setDamageMode(bool enabled);
+	void setMode(Mode mode);
 
 
 	//////// used controllers ////////
@@ -148,7 +170,8 @@ private:
 	std::vector<const char*> m_damagerNames;
 	uint32_t				 m_damagerIndex;
 
-	bool                     m_damageMode;
+	Mode                     m_mode;
+	float					 m_forceStrength;
 
 	physx::PxVec2            m_lastMousePos;
 	bool                     m_isMousePressed;

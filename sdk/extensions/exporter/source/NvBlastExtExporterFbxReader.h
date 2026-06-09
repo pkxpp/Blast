@@ -32,6 +32,7 @@
 #include <memory>
 #include "fbxsdk.h"
 #include <vector>
+#include <string>
 #include <map>
 #include "NvBlastExtExporter.h"
 #include "NvBlastExtAuthoringTypes.h"

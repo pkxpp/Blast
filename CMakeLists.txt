@@ -13,6 +13,8 @@ IF(NOT DEFINED BLAST_ROOT_DIR)
 
 ENDIF()
 
+INCLUDE_DIRECTORIES(${BLAST_ROOT_DIR}/sdk/compiler/cmake/compat)
+
 IF(NOT EXISTS ${BLAST_ROOT_DIR})
 	MESSAGE(FATAL_ERROR "BLAST_ROOT_DIR environment variable wasn't set or was invalid.")
 ENDIF()
